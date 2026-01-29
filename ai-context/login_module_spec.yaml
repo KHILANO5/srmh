@@ -1,0 +1,210 @@
+module:
+  name: Authentication & Login
+  system: Dayflow HRMS
+  stack:
+    frontend: React + Tailwind CSS
+    backend: Node.js + Express
+    database: MySQL
+    auth_method: JWT
+  roles:
+    - ADMIN
+    - EMPLOYEE
+
+objectives:
+  - authenticate_users_securely
+  - enforce_role_based_access_control
+  - issue_jwt_on_successful_login
+  - protect_private_routes
+  - prevent_unauthorized_access
+  - provide_clear_error_feedback
+
+flows:
+  login:
+    steps:
+      - user_opens_login_page
+      - user_enters_email_and_password
+      - frontend_validates_fields
+      - frontend_sends_post_request_to_backend
+      - backend_verifies_user_exists
+      - backend_compares_password_hash
+      - backend_generates_jwt
+      - backend_returns_token_and_role
+      - frontend_stores_token_securely
+      - frontend_redirects_based_on_role
+
+flows:
+  logout:
+    steps:
+      - user_clicks_logout
+      - frontend_deletes_jwt
+      - frontend_redirects_to_login
+
+frontend:
+  routes:
+    public:
+      - /login
+      - /register
+    protected:
+      employee:
+        - /dashboard
+      admin:
+        - /admin/dashboard
+
+components:
+  LoginPage:
+    fields:
+      - email_input
+      - password_input
+      - submit_button
+      - error_message
+      - loading_spinner
+    validations:
+      email:
+        required: true
+        format: email
+      password:
+        required: true
+        min_length: 8
+
+state:
+  auth:
+    token_storage: localStorage
+    role_storage: localStorage
+    user_storage: memory
+
+backend:
+  endpoint:
+    path: POST /api/auth/login
+    access: public
+
+request:
+  body:
+    email: string
+    password: string
+
+response:
+  success:
+    status: 200
+    body:
+      token: jwt_string
+      role: ADMIN|EMPLOYEE
+      user:
+        id: int
+        full_name: string
+        email: string
+  failure:
+    status: 401|404|500
+    body:
+      error: string
+
+database:
+  table: users
+  lookup:
+    by: email
+  required_fields:
+    - id
+    - full_name
+    - email
+    - password_hash
+    - role
+
+security:
+  password:
+    hashing: bcrypt
+    compare_method: bcrypt.compare
+  jwt:
+    algorithm: HS256
+    secret: env.JWT_SECRET
+    expires_in: 24h
+    payload:
+      - user_id
+      - role
+  protections:
+    - rate_limit_login_attempts
+    - generic_error_messages
+    - prevent_user_enumeration
+
+validation:
+  email:
+    format: standard_email
+    max_length: 100
+  password:
+    min_length: 8
+    max_length: 64
+
+errors:
+  invalid_credentials:
+    status: 401
+    message: "Invalid email or password"
+  user_not_found:
+    status: 404
+    message: "Invalid email or password"
+  server_error:
+    status: 500
+    message: "Authentication service unavailable"
+
+redirects:
+  ADMIN: /admin/dashboard
+  EMPLOYEE: /dashboard
+
+middleware:
+  auth_verify:
+    input: Authorization Bearer <token>
+    steps:
+      - extract_token
+      - verify_signature
+      - decode_payload
+      - attach_user_to_request
+  role_guard:
+    input: role
+    logic:
+      - if role != required_role: reject_request
+
+storage:
+  frontend:
+    token:
+      location: localStorage
+      key: dayflow_token
+    role:
+      location: localStorage
+      key: dayflow_role
+
+tests:
+  - name: valid_login_employee
+    expected: token_issued_redirect_employee_dashboard
+  - name: valid_login_admin
+    expected: token_issued_redirect_admin_dashboard
+  - name: invalid_password
+    expected: 401_error
+  - name: unknown_email
+    expected: 401_error
+  - name: missing_fields
+    expected: validation_error
+
+files:
+  frontend:
+    - src/pages/Login.jsx
+    - src/services/authService.js
+    - src/context/AuthContext.jsx
+    - src/routes/ProtectedRoute.jsx
+  backend:
+    - routes/authRoutes.js
+    - controllers/authController.js
+    - middleware/authMiddleware.js
+    - config/jwt.js
+
+standards:
+  frontend:
+    - use_async_await
+    - centralized_api_calls
+    - tailwind_only_styling
+  backend:
+    - async_controllers
+    - try_catch_wrapping
+    - environment_variables_only_for_secrets
+
+extensions:
+  - refresh_tokens
+  - remember_me_checkbox
+  - two_factor_auth
+  - captcha_on_multiple_failures
